@@ -3,14 +3,21 @@ import time
 import pygame
 from enum import Enum
 
+
 # CONSTANTS
 # SCREEN
 SCREEN_WIDTH = 600
 SCREEN_HEIGHT = 600
 FPS = 10
 
+
 # GRID
 GRID_SIZE = 20
+
+
+# FONTS
+TEXT_FONT = pygame.font.SysFont("monospace", 16)
+TITLE_FONT = pygame.font.SysFont("monospace", 28)
 
 
 # Color Enum holding rgb values
@@ -129,84 +136,107 @@ class Food:
         pygame.draw.rect(screen, self.color.value, r)
 
 
-def handle_events(snake):
-    # Allow only one press per loop
-    pressed = False
+class Game:
+    def __init__(
+            self,
+            screen_width=SCREEN_WIDTH,
+            screen_height=SCREEN_HEIGHT,
+            fps=FPS,
+    ):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.fps = fps
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            quit()
+        pygame.init()
 
-        # Snake controls
-        elif event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_UP, pygame.K_w) and pressed is False:
-                snake.turn(Direction.UP)
-                pressed = True
-            if event.key in (pygame.K_DOWN, pygame.K_s) and pressed is False:
-                snake.turn(Direction.DOWN)
-                pressed = True
-            if event.key in (pygame.K_RIGHT, pygame.K_d) and pressed is False:
-                snake.turn(Direction.RIGHT)
-                pressed = True
-            if event.key in (pygame.K_LEFT, pygame.K_a) and pressed is False:
-                snake.turn(Direction.LEFT)
-                pressed = True
+        self.clock = clock = pygame.time.Clock()
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
+        pygame.display.set_caption("Snake Game")
 
-def main():
-    pygame.init()
+        self.snake = Snake()
+        self.food = Food()
+        self.score = 0
 
-    clock = pygame.time.Clock()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.game_over = False
 
-    text_font = pygame.font.SysFont("monospace", 16)
+    def update_score(self):
+        if self.food.position == self.snake.get_head_position():
+            self.score += 1
+            self.snake.length += 1
+            # set new location for food
+            self.food.randomize()
 
-    pygame.display.set_caption("Snake Game")
-
-    snake = Snake()
-    food = Food()
-    score = 0
-
-    game_over = False
-
-    while not game_over:
-        clock.tick(FPS)
-
-        handle_events(snake)
-
-        # Move snake and check if valid move, game over if not
-        game_over = not snake.move()
-
+    def update_screen(self):
         # Black screen
-        screen.fill(Color.BLACK.value)
+        self.screen.fill(Color.BLACK.value)
 
         # Draw snake and food on top
-        snake.draw(screen)
-        food.draw(screen)
-
-        # Check if snake has eaten food
-        if food.position == snake.get_head_position():
-            score += 1
-            snake.length += 1
-            # set new location for food
-            food.randomize()
+        self.snake.draw(self.screen)
+        self.food.draw(self.screen)
 
         # Draw scoreboard
-        score_text = text_font.render("Score {0}".format(score), 1, Color.WHITE.value)
-        screen.blit(score_text, (10, 10))
+        score_text = TEXT_FONT.render("Score {0}".format(self.score), 1, Color.WHITE.value)
+        self.screen.blit(score_text, (10, 10))
 
         pygame.display.update()
 
-    # Game Over Text in center of screen
-    title_font = pygame.font.SysFont("monospace", 28)
-    game_over_text = title_font.render("Game Over you scored {0}".format(score), 10, Color.RED.value)
-    center_game_over_text = game_over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2))
-    screen.blit(game_over_text, center_game_over_text)
-    pygame.display.update()
+    def handle_events(self):
+        # Allow only one press per loop
+        pressed = False
 
-    # Wait 5 seconds and quit
-    time.sleep(5)
-    pygame.quit()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+            # Snake controls
+            elif event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_UP, pygame.K_w) and pressed is False:
+                    self.snake.turn(Direction.UP)
+                    pressed = True
+                if event.key in (pygame.K_DOWN, pygame.K_s) and pressed is False:
+                    self.snake.turn(Direction.DOWN)
+                    pressed = True
+                if event.key in (pygame.K_RIGHT, pygame.K_d) and pressed is False:
+                    self.snake.turn(Direction.RIGHT)
+                    pressed = True
+                if event.key in (pygame.K_LEFT, pygame.K_a) and pressed is False:
+                    self.snake.turn(Direction.LEFT)
+                    pressed = True
+
+    def game_over(self):
+        game_over_text = TITLE_FONT.render("Game Over you scored {0}".format(self.score), 10, Color.RED.value)
+        center_game_over_text = game_over_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        self.screen.blit(game_over_text, center_game_over_text)
+        pygame.display.update()
+
+        # Wait 5 seconds and quit
+        time.sleep(5)
+        pygame.quit()
+
+    def game_step(self):
+        # Handle user input
+        self.handle_events()
+
+        # Move snake and check if it was a valid move
+        # If not, game is over
+        self.game_over = not self.snake.move()
+
+        # Update score if snake has eaten food
+        self.update_score()
+
+        # Fill screen and draw all objects on it
+        self.update_screen()
+
+
+def main():
+    game = Game()
+
+    # Game loop
+    while not game.game_over:
+        game.game_step()
+
+    game.game_over()
 
 
 main()
