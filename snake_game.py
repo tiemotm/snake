@@ -3,21 +3,18 @@ import time
 import pygame
 from enum import Enum
 
-
 # CONSTANTS
+
 # SCREEN
 SCREEN_WIDTH = 600
 SCREEN_HEIGHT = 600
-FPS = 10
+
+
+SPEED = 10
 
 
 # GRID
 GRID_SIZE = 20
-
-
-# FONTS
-TEXT_FONT = pygame.font.SysFont("monospace", 16)
-TITLE_FONT = pygame.font.SysFont("monospace", 28)
 
 
 # Color Enum holding rgb values
@@ -96,12 +93,10 @@ class Snake:
 
         # insert new head
         self.positions.insert(0, new_head_pos)
-        print(self.positions)
 
         # pop last element if there are more elements than the length
         if len(self.positions) > self.length:
             self.positions.pop()
-            print(self.positions)
 
         # Check for collisions, return True for a valid move with no collisions
         return not self.check_collision()
@@ -136,23 +131,45 @@ class Food:
         pygame.draw.rect(screen, self.color.value, r)
 
 
+def check_play_again():
+    valid_input = False
+    play_again = False
+
+    while not valid_input:
+        input_play_again = input("Do you want to play again? y/n\n")
+
+        if input_play_again in ("y", "Y"):
+            valid_input = True
+            play_again = True
+        elif input_play_again in ("n", "N"):
+            valid_input = True
+            play_again = False
+        else:
+            print("Wrong input")
+
+    return play_again
+
+
 class Game:
     def __init__(
             self,
             screen_width=SCREEN_WIDTH,
             screen_height=SCREEN_HEIGHT,
-            fps=FPS,
+            speed=SPEED,
     ):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.fps = fps
+        self.speed = speed
 
         pygame.init()
 
         self.clock = clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-
         pygame.display.set_caption("Snake Game")
+
+        # FONTS
+        self.TEXT_FONT = pygame.font.SysFont("monospace", 16)
+        self.TITLE_FONT = pygame.font.SysFont("monospace", 28)
 
         self.snake = Snake()
         self.food = Food()
@@ -168,15 +185,13 @@ class Game:
             self.food.randomize()
 
     def update_screen(self):
-        # Black screen
         self.screen.fill(Color.BLACK.value)
-
         # Draw snake and food on top
         self.snake.draw(self.screen)
         self.food.draw(self.screen)
 
         # Draw scoreboard
-        score_text = TEXT_FONT.render("Score {0}".format(self.score), 1, Color.WHITE.value)
+        score_text = self.TEXT_FONT.render("Score {0}".format(self.score), True, Color.WHITE.value)
         self.screen.blit(score_text, (10, 10))
 
         pygame.display.update()
@@ -187,6 +202,7 @@ class Game:
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                pygame.quit()
                 quit()
 
             # Snake controls
@@ -204,15 +220,17 @@ class Game:
                     self.snake.turn(Direction.LEFT)
                     pressed = True
 
-    def game_over(self):
-        game_over_text = TITLE_FONT.render("Game Over you scored {0}".format(self.score), 10, Color.RED.value)
+    def reset(self):
+        self.screen = 0
+        self.snake = Snake()
+        self.food.randomize()
+
+    def game_end(self):
+        print("Game over, you scored ", self.score)
+        game_over_text = self.TITLE_FONT.render("Game over, you scored {0}".format(self.score), True, Color.RED.value)
         center_game_over_text = game_over_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
         self.screen.blit(game_over_text, center_game_over_text)
         pygame.display.update()
-
-        # Wait 5 seconds and quit
-        time.sleep(5)
-        pygame.quit()
 
     def game_step(self):
         # Handle user input
@@ -227,16 +245,35 @@ class Game:
 
         # Fill screen and draw all objects on it
         self.update_screen()
+        self.clock.tick(self.speed)
+
+    def start_timer(self, length):
+        for i in range(length, 0, -1):
+            self.screen.fill(Color.BLACK.value)
+            game_over_text = self.TITLE_FONT.render("{0}".format(i), True, Color.RED.value)
+            center_game_over_text = game_over_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+            self.screen.blit(game_over_text, center_game_over_text)
+            pygame.display.update()
+            time.sleep(1)
+
+    def run(self):
+        self.start_timer(3)
+        # Game loop
+        while True:
+            self.game_step()
+
+            if self.game_over:
+                self.game_end()
+
+                if check_play_again():
+                    self.reset()
+                    self.start_timer(3)
+                else:
+                    break
+
+        pygame.quit()
 
 
-def main():
+if __name__ == "__main__":
     game = Game()
-
-    # Game loop
-    while not game.game_over:
-        game.game_step()
-
-    game.game_over()
-
-
-main()
+    game.run()
