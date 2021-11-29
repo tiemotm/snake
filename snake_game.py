@@ -1,3 +1,4 @@
+import itertools
 import random
 import time
 import pygame
@@ -9,9 +10,7 @@ from enum import Enum
 SCREEN_WIDTH = 600
 SCREEN_HEIGHT = 600
 
-
 SPEED = 10
-
 
 # GRID
 GRID_SIZE = 20
@@ -49,13 +48,12 @@ class Direction(Enum):
 class Snake:
     def __init__(
             self,
-            x=(SCREEN_WIDTH / 2),
-            y=(SCREEN_HEIGHT / 2),
+            position=((SCREEN_WIDTH / 2), (SCREEN_HEIGHT / 2)),
             length=1,
             color=Color.GREEN,
             direction=random.choice(list(Direction))
     ):
-        self.positions = [(x, y)]
+        self.positions = [position]
         self.length = length
         self.direction = direction
         self.color = color
@@ -87,8 +85,8 @@ class Snake:
         # New head position depending on direction
         # add % SCREEN_WIDTH to enable moving trough border
         new_head_pos = (
-            (head_pos[0] + (x * GRID_SIZE)),
-            (head_pos[1] + (y * GRID_SIZE))
+            ((head_pos[0] + (x * GRID_SIZE)) % SCREEN_WIDTH),
+            ((head_pos[1] + (y * GRID_SIZE)) % SCREEN_WIDTH)
         )
 
         # insert new head
@@ -105,26 +103,32 @@ class Snake:
         for p in self.positions:
             r = pygame.Rect((p[0], p[1]), (GRID_SIZE, GRID_SIZE))
             pygame.draw.rect(screen, self.color.value, r)
-            pygame.draw.rect(screen, (93, 216, 228), r, 1)
+            pygame.draw.rect(screen, Color.BLACK.value, r, 1)
 
 
 # If values empty initialize red food randomly on the screen
+def random_position(snake):
+    # Allowing to spawn behind snake
+    # x = random.randrange(0, SCREEN_WIDTH, GRID_SIZE)
+    # y = random.randrange(0, SCREEN_HEIGHT, GRID_SIZE)
+
+    possible_values = itertools.product(
+        list(range(0, SCREEN_WIDTH, GRID_SIZE)),
+        list(range(0, SCREEN_HEIGHT, GRID_SIZE)))
+
+    allowed_values = list(filter(lambda pos: pos not in snake.positions, possible_values))
+
+    return random.choice(allowed_values)
+
+
 class Food:
     def __init__(
             self,
-            x=random.randrange(0, SCREEN_WIDTH, GRID_SIZE),
-            y=random.randrange(0, SCREEN_HEIGHT, GRID_SIZE),
+            position,
             color=Color.RED
     ):
-        self.position = (x, y)
+        self.position = position
         self.color = color
-
-    # Set new random direction
-    def randomize(self):
-        x = random.randrange(0, SCREEN_WIDTH, GRID_SIZE)
-        y = random.randrange(0, SCREEN_HEIGHT, GRID_SIZE)
-
-        self.position = (x, y)
 
     def draw(self, screen):
         r = pygame.Rect((self.position[0], self.position[1]), (GRID_SIZE, GRID_SIZE))
@@ -153,17 +157,13 @@ def check_play_again():
 class Game:
     def __init__(
             self,
-            screen_width=SCREEN_WIDTH,
-            screen_height=SCREEN_HEIGHT,
             speed=SPEED,
     ):
-        self.screen_width = screen_width
-        self.screen_height = screen_height
         self.speed = speed
 
         pygame.init()
 
-        self.clock = clock = pygame.time.Clock()
+        self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Snake Game")
 
@@ -172,23 +172,24 @@ class Game:
         self.TITLE_FONT = pygame.font.SysFont("monospace", 28)
 
         self.snake = Snake()
-        self.food = Food()
-        self.score = 0
+        self.food = Food(random_position(self.snake))
+        self.score = 1
 
         self.game_over = False
+        self.game_won = True
 
     def update_score(self):
         if self.food.position == self.snake.get_head_position():
             self.score += 1
             self.snake.length += 1
             # set new location for food
-            self.food.randomize()
+            self.food = Food(random_position(self.snake))
 
     def update_screen(self):
         self.screen.fill(Color.BLACK.value)
         # Draw snake and food on top
-        self.snake.draw(self.screen)
         self.food.draw(self.screen)
+        self.snake.draw(self.screen)
 
         # Draw scoreboard
         score_text = self.TEXT_FONT.render("Score {0}".format(self.score), True, Color.WHITE.value)
@@ -221,15 +222,25 @@ class Game:
                     pressed = True
 
     def reset(self):
-        self.screen = 0
+        self.score = 1
         self.snake = Snake()
-        self.food.randomize()
+        self.food = Food(random_position(self.snake))
+
+    def check_win(self):
+        return ((SCREEN_WIDTH/GRID_SIZE) * (SCREEN_HEIGHT/GRID_SIZE)) == self.snake.length
 
     def game_end(self):
-        print("Game over, you scored ", self.score)
-        game_over_text = self.TITLE_FONT.render("Game over, you scored {0}".format(self.score), True, Color.RED.value)
-        center_game_over_text = game_over_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
-        self.screen.blit(game_over_text, center_game_over_text)
+        if self.game_won is True:
+            game_end_string = "You won"
+            color = Color.BLACK
+        else:
+            game_end_string = "Game over, you scored {0}".format(self.score)
+            color = Color.RED
+
+        print(game_end_string)
+        game_end_text = self.TITLE_FONT.render(game_end_string, True, color.value)
+        center_game_end_text = game_end_text.get_rect(center=(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2))
+        self.screen.blit(game_end_text, center_game_end_text)
         pygame.display.update()
 
     def game_step(self):
@@ -242,6 +253,8 @@ class Game:
 
         # Update score if snake has eaten food
         self.update_score()
+
+        self.game_won = self.check_win()
 
         # Fill screen and draw all objects on it
         self.update_screen()
@@ -262,7 +275,7 @@ class Game:
         while True:
             self.game_step()
 
-            if self.game_over:
+            if self.game_over or self.game_won:
                 self.game_end()
 
                 if check_play_again():
